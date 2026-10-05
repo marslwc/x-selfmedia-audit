@@ -2,7 +2,7 @@
 name: x-selfmedia-audit
 description: "End-to-end self-audit of a personal X (Twitter) account. Diagnoses account metrics, content performance, personal-brand positioning, and platform/algorithm fit, then delivers strategic direction, a content system, and a concrete 30/60/90-day action playbook. This skill should be used when a creator wants a health check on their own X account, asks why growth stalled or engagement dropped, wants to know whether they qualify for X monetization, wants a positioning/niche review, or wants an actionable X content plan. Triggers include X 账号诊断, 账号体检, 复盘, 涨粉方案, 定位分析, 内容策略, 变现资格, 限流自查. Not for managing a brand/official account, not for other platforms, and not for pure post-writing (use us-social-voice or humanizer-zh instead)."
 agent_created: true
-version: 1.0.2
+version: 1.0.3
 display_name: "X 自媒体账号诊断"
 display_name_en: "X Self-Media Account Audit"
 ---
@@ -71,6 +71,15 @@ display_name_en: "X Self-Media Account Audit"
 | **L5 结论与策略** | 交叉验证、优先级排序 | 最致命的 1–2 个问题是什么？先修哪个？ |
 
 **L1 和 L4 的规则细节**：算法权重、时间常数、限流标签见 `references/algorithm-rules.md`；互动率与格式基准见 `references/benchmarks.md`；变现资格见 `references/monetization.md`。
+
+> ⚠️ **开处方前必须确认的一件事：用户的目标是涨粉还是变现。**
+>
+> 两者在**回复区**上的最优配比是**相反**的：
+> - 回复区是**涨粉**主战场——算法给回复 +13.5（点赞的 27 倍）、作者回评 +75（全系统最高），且是唯一不看粉丝数的曝光面
+> - 但**回复产生的曝光完全不计入变现门槛**——纯靠回复做起来的账号，互动数据再漂亮也可能永远够不到 500,000 曝光线
+>
+> 配比建议：涨粉导向 → 回复 50% / 原创 50%；**变现导向 → 原创 70% / 回复 30%**。
+> 不确认目标就开处方，有一半概率开反。详见 `references/monetization.md` 的「回复区悖论」。
 
 **L1 必做的排除法**（决定后面所有结论的方向）：
 - 曝光低 + 互动率正常 → **分发问题**（账号权重、内容不被推荐、时段错）

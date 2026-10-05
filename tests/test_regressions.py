@@ -178,6 +178,25 @@ def test_monetization_hard_gate():
 
 # ---------------------------------------------------------------- 测试 6
 
+def test_reply_impression_paradox():
+    print("\n[7] 回复区悖论：变现输出必须提示回复曝光不计入")
+    code, out, err = run(MONETIZATION, ["--demo"])
+    check("脚本正常退出", code == 0, err[:300])
+    check("输出回复区悖论章节", "回复区悖论" in out)
+    check("明确说明回复曝光不计入",
+          "不计入" in out and "回复" in out,
+          "未找到「回复曝光不计入」的明确说明")
+    check("给出目标分岔的配比建议",
+          "原创 70%" in out and "回复 50%" in out)
+    # x_audit 侧的算法规则文件也应有交叉引用
+    algo = os.path.join(ROOT, "references", "algorithm-rules.md")
+    with open(algo, encoding="utf-8") as f:
+        algo_text = f.read()
+    check("算法规则文件有反向交叉引用",
+          "不计入变现门槛" in algo_text,
+          "algorithm-rules.md 未提示回复曝光不计入变现")
+
+
 def test_demo_still_works():
     print("\n[6] 内置样例数据仍可正常运行（回归保护）")
     for script, label in ((X_AUDIT, "x_audit"), (MONETIZATION, "monetization_check")):
@@ -203,6 +222,7 @@ def main():
     test_monetization_missing_data()
     test_monetization_hard_gate()
     test_demo_still_works()
+    test_reply_impression_paradox()
 
     print("\n" + "=" * 62)
     total = _passed + _failed
