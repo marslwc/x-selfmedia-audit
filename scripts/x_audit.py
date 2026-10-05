@@ -119,6 +119,7 @@ def load_json(text):
         "account": account,
         "posts": posts,
         "profile_visits": data.get("profile_visits"),
+        "account_impressions": data.get("account_impressions"),
         "new_follows": data.get("new_follows"),
         "window_days": data.get("window_days"),
     }
@@ -179,6 +180,17 @@ def analyze(dataset):
     median_er = statistics.median(per_post_er) if per_post_er else 0.0
     avg_er = statistics.fmean(per_post_er) if per_post_er else 0.0
 
+    # 曝光分布：均值 vs 中位数。
+    # 均值极易被单条爆量帖子拉高，进而把四象限的「分发」判定带偏，
+    # 因此两者都要算，并在偏度大时以中位数为准。
+    impressions_list = [p["impressions"] for p in posts]
+    median_imp = statistics.median(impressions_list) if impressions_list else 0.0
+    avg_imp = sum_imp / n
+    mean_median_skew = (avg_imp / median_imp) if median_imp > 0 else 0.0
+    reach_ratio_mean = (avg_imp / followers) if followers > 0 else 0.0
+    reach_ratio_median = (median_imp / followers) if followers > 0 else 0.0
+    zero_interaction_share = (sum(1 for p in posts if p["_interactions"] == 0) / n * 100)
+
     mean_int = sum_int / n
     viral = [p for p in posts if mean_int > 0 and p["_interactions"] >= VIRAL_MULTIPLE * mean_int]
     viral_rate = len(viral) / n * 100
@@ -192,7 +204,12 @@ def analyze(dataset):
 
     # 主页访问数：优先用账号级数据，缺失则用帖子级 profile_clicks 加总。
     # 两者都拿不到时标记为「缺失」，不能当成 0 处理（否则会产生假预警）。
+    #
+    # ⚠️ 窗口一致性：profile_visits 通常来自后台（如近 28 天），而 posts 可能只是
+    # 最近 2 天的样本。若直接相除，会得到一个毫无意义的比率（可能虚高十几倍）。
+    # 因此要求同时提供 account_impressions（与 profile_visits 同窗口的后台曝光总量）。
     pv = dataset.get("profile_visits")
+    acc_imp = dataset.get("account_impressions")
     profile_conv_known = True
     if pv is None:
         if sum_pc > 0:
@@ -200,7 +217,14 @@ def analyze(dataset):
         else:
             pv = 0.0
             profile_conv_known = False
-    profile_conv = (float(pv) / sum_imp) if (sum_imp > 0 and profile_conv_known) else None
+    if acc_imp and float(acc_imp) > 0:
+        profile_conv = (float(pv) / float(acc_imp)) if profile_conv_known else None
+        profile_conv_basis = f"账号级曝光 {float(acc_imp):,.0f}（与主页访问同窗口）"
+    else:
+        profile_conv = (float(pv) / sum_imp) if (sum_imp > 0 and profile_conv_known) else None
+        profile_conv_basis = "帖子样本曝光合计"
+    # 只给了主页访问、没给同窗口曝光 → 分母可能错窗口，必须提示
+    window_mismatch = bool(profile_conv_known and pv and not acc_imp)
 
     # 内容类型分布
     by_type = {}
@@ -249,6 +273,11 @@ def analyze(dataset):
         "sum_impressions": sum_imp,
         "sum_interactions": sum_int,
         "avg_impressions": sum_imp / n,
+        "median_impressions": median_imp,
+        "mean_median_skew": mean_median_skew,
+        "reach_ratio_mean": reach_ratio_mean,
+        "reach_ratio_median": reach_ratio_median,
+        "zero_interaction_share": zero_interaction_share,
         "avg_interactions": mean_int,
         "er_imp": er_imp,
         "er_fol": er_fol,
@@ -261,6 +290,8 @@ def analyze(dataset):
         "reply_like_ratio": reply_like,
         "profile_visits": float(pv),
         "profile_conv": profile_conv,
+        "profile_conv_basis": profile_conv_basis,
+        "window_mismatch": window_mismatch,
         "profile_click_rate": profile_click_rate,
         "new_follows": dataset.get("new_follows"),
         "viral_count": len(viral),
@@ -340,6 +371,16 @@ def compute_flags(r):
         s = by_type.get(name)
         return (s["share"] if s else 0.0)
 
+    # 分布健康度：先看整体分布，再看具体类型
+    if r.get("mean_median_skew", 0) >= 2.0:
+        flags.append(("中", f"曝光分布被单条帖子主导（均值/中位数 = {r['mean_median_skew']:.1f}×）",
+                      "均值口径会让「单帖平均曝光」看起来正常，掩盖大多数帖子分发不足的事实",
+                      "改用中位数评估分发；同时解剖那条高曝光帖子，看曝光来自推荐还是搜索、能否复制"))
+    if r.get("zero_interaction_share", 0) >= 50:
+        flags.append(("高", f"零互动帖占比 {r['zero_interaction_share']:.1f}%",
+                      "超过一半的帖子没有任何回应。这更像分发问题（帖子没被推出去），而不是内容质量问题",
+                      "先降发帖密度（同作者衰减 ×0.625/×0.4375），再检查钩子；不要用「多发」解决「没人理」"))
+
     link_share = share_of("link")
     rt_share = share_of("retweet")
     daily_share = share_of("daily")
@@ -372,6 +413,11 @@ def compute_flags(r):
         flags.append(("低", "主页访问数据缺失",
                       "无法评估「曝光 → 主页 → 关注」的转化漏斗中段",
                       "从 X Analytics 补「主页访问数」，这是判断门面好坏的唯一依据"))
+    elif r.get("window_mismatch"):
+        flags.append(("中", "主页访问率的分母窗口不一致，结论不可信",
+                      "主页访问数来自后台（如近 28 天），但曝光分母只是帖子样本的合计，"
+                      "两者窗口不同，相除会得到虚高的比率",
+                      "补一个 account_impressions 字段（与主页访问同窗口的后台曝光总量）后重跑"))
     elif r["profile_conv"] < PROFILE_CLICK_FLOOR:
         flags.append(("高", f"主页访问/曝光仅 {r['profile_conv']*100:.2f}%",
                       "低于 0.5% 参考下限，说明内容没有激发「想认识你」的冲动",
@@ -414,11 +460,18 @@ def compute_flags(r):
 def diagnose_quadrant(r):
     """四象限排除法：先判分发问题还是内容问题。"""
     band, _ = band_for(r["er_imp"], IMPRESSION_ER_BANDS)
-    imp_ok = r["avg_impressions"] > 0
     followers = r["followers"]
 
-    # 单帖平均曝光相对粉丝数的倍数，作为「分发是否正常」的粗略代理
-    reach_ratio = (r["avg_impressions"] / followers) if followers > 0 else 0.0
+    # 偏度保护：单条爆量帖子会把均值曝光拉高，使 reach_ratio 越过 0.15 阈值，
+    # 从而把「分发受限」误判成「分发正常」。均值 ≥2× 中位数时改用中位数口径。
+    skew = r.get("mean_median_skew") or 0.0
+    if followers > 0 and skew >= 2.0:
+        reach_ratio = r.get("reach_ratio_median") or 0.0
+        reach_basis = f"中位数口径（均值/中位数={skew:.1f}×，均值被异常值主导）"
+    else:
+        reach_ratio = (r["avg_impressions"] / followers) if followers > 0 else 0.0
+        reach_basis = "均值口径"
+
     if followers > 0:
         if reach_ratio >= 0.5:
             reach_label = "分发正常（单帖曝光 ≥ 粉丝数的 50%）"
@@ -446,7 +499,8 @@ def diagnose_quadrant(r):
         action = "转向转化层：检查简介、置顶帖、头像、CTA（主页转化）"
 
     return {"verdict": verdict, "action": action, "reach_label": reach_label,
-            "er_band": band, "reach_ratio": reach_ratio}
+            "reach_basis": reach_basis, "reach_ratio": reach_ratio,
+            "er_band": band, "zero_interaction_share": r.get("zero_interaction_share")}
 
 
 # ---------------------------------------------------------------- 输出
@@ -468,7 +522,11 @@ def render_markdown(r, score, notes, quad, flags):
     L.append("| 指标 | 数值 | 说明 |")
     L.append("|---|---|---|")
     L.append(f"| 曝光总量 | {r['sum_impressions']:,.0f} | |")
-    L.append(f"| 单帖平均曝光 | {r['avg_impressions']:,.0f} | |")
+    L.append(f"| 单帖平均曝光 | {r['avg_impressions']:,.0f} | 易被单条爆量帖拉高，勿单独使用 |")
+    L.append(f"| **单帖曝光中位数** | **{r.get('median_impressions', 0):,.0f}** | 更接近「一条普通帖子」的真实量级 |")
+    L.append(f"| 单帖曝光/粉丝（均值） | {r.get('reach_ratio_mean', 0)*100:.1f}% | 健康参考 ≥15% |")
+    L.append(f"| 单帖曝光/粉丝（中位数） | {r.get('reach_ratio_median', 0)*100:.1f}% | 健康参考 ≥15% |")
+    L.append(f"| 零互动帖占比 | {r.get('zero_interaction_share', 0):.1f}% | 越低越好；偏高说明多数帖子无人回应 |")
     L.append(f"| 互动总量 | {r['sum_interactions']:,.0f} | 赞+回复+转推+收藏 |")
     L.append(f"| **互动率（曝光口径）** | **{r['er_imp']:.2f}%** | 主判据 |")
     L.append(f"| 互动率（粉丝口径，单帖） | {r['er_fol']:.2f}% | 口径存疑，仅作同量级相对比较 |")
@@ -480,6 +538,9 @@ def render_markdown(r, score, notes, quad, flags):
         pc_display = f"{r['profile_conv']*100:.2f}%"
         pc_note = ("低于 0.5%，内容没激发「想认识你」的冲动" if r["profile_conv"] < PROFILE_CLICK_FLOOR
                    else "在参考区间内" if r["profile_conv"] < 0.02 else "表现良好，主页承接能力强")
+        pc_note = f"{pc_note}（分母：{r.get('profile_conv_basis', '—')}）"
+        if r.get("window_mismatch"):
+            pc_note += " ⚠️ 窗口可能不一致，此比率不可信"
     L.append(f"| 主页访问/曝光 | {pc_display} | {pc_note} |")
     L.append(f"| 爆款率 | {r['viral_rate']:.1f}% | ≥3× 均值的帖子占比 |")
     if r.get("new_follows") is not None:
@@ -495,8 +556,15 @@ def render_markdown(r, score, notes, quad, flags):
     L.append("")
 
     L.append("## 三、四象限排除法\n")
-    L.append(f"- 分发判断：{quad['reach_label']}")
+    L.append(f"- 分发判断：{quad['reach_label']}（{quad.get('reach_basis', '均值口径')}）")
     L.append(f"- 互动率判定：{quad['er_band']}")
+    if r.get("mean_median_skew", 0) >= 2.0:
+        L.append(f"- ⚠️ 曝光分布偏度高：均值是中位数的 {r['mean_median_skew']:.1f} 倍，"
+                 f"说明有单条帖子主导了均值。**此时不要用均值下结论**，"
+                 f"以中位数（{r.get('median_impressions', 0):,.0f}）为准。")
+    if r.get("zero_interaction_share", 0) >= 50:
+        L.append(f"- ⚠️ 零互动帖占比 {r['zero_interaction_share']:.1f}%，"
+                 f"说明大多数帖子没有引起任何回应——这通常指向分发问题，而非内容质量问题。")
     L.append(f"- **结论：{quad['verdict']}**")
     L.append(f"- **处方方向：{quad['action']}**")
     L.append("")

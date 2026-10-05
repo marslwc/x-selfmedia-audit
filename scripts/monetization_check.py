@@ -121,12 +121,21 @@ def estimate_timeline(profile, results):
 def suggest(profile, ocr_results, sub_results):
     ocr_fail_soft = [r for r in ocr_results if r["status"] == "未达标" and not r["hard"]]
     ocr_fail_hard = [r for r in ocr_results if r["status"] == "未达标" and r["hard"]]
+    ocr_missing = [r for r in ocr_results if r["status"] == "缺失"]
     sub_fail = [r for r in sub_results if r["status"] == "未达标"]
+    sub_missing = [r for r in sub_results if r["status"] == "缺失"]
 
     out = []
     if ocr_fail_hard:
         out.append("**路径 A（Original Content Rewards）暂不可申请**——存在硬门槛缺口："
                    + "、".join(r["label"] for r in ocr_fail_hard))
+    elif ocr_missing:
+        # 缺失 != 通过。早期版本会把"没提供数据"误判成"已满足条件"，这里显式拦截。
+        out.append("**路径 A 无法判定**——以下门槛缺少数据，不能视为已通过："
+                   + "、".join(r["label"] for r in ocr_missing)
+                   + "。补齐后再看结论。")
+        if ocr_fail_soft:
+            out.append("路径 A 已确认的缺口：" + "、".join(r["label"] for r in ocr_fail_soft) + "。")
     elif not ocr_fail_soft:
         out.append("**路径 A 已满足全部条件**——建议直接到 Creator Studio 提交申请，"
                    "以页面显示的实时条件为准。")
@@ -134,7 +143,10 @@ def suggest(profile, ocr_results, sub_results):
         out.append("**路径 A 尚未达标**，缺口：" + "、".join(r["label"] for r in ocr_fail_soft)
                    + "。其中资料类（头像/横幅/简介/2FA/邮箱）当天可补齐。")
 
-    if not sub_fail:
+    if sub_missing:
+        out.append("**路径 B 无法判定**——以下门槛缺少数据，不能视为已通过："
+                   + "、".join(r["label"] for r in sub_missing) + "。")
+    elif not sub_fail:
         out.append("**路径 B（Creator Subscriptions）已满足条件**，可申请。")
     else:
         out.append("**路径 B 尚未达标**，缺口：" + "、".join(r["label"] for r in sub_fail) + "。")

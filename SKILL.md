@@ -2,7 +2,7 @@
 name: x-selfmedia-audit
 description: "End-to-end self-audit of a personal X (Twitter) account. Diagnoses account metrics, content performance, personal-brand positioning, and platform/algorithm fit, then delivers strategic direction, a content system, and a concrete 30/60/90-day action playbook. This skill should be used when a creator wants a health check on their own X account, asks why growth stalled or engagement dropped, wants to know whether they qualify for X monetization, wants a positioning/niche review, or wants an actionable X content plan. Triggers include X 账号诊断, 账号体检, 复盘, 涨粉方案, 定位分析, 内容策略, 变现资格, 限流自查. Not for managing a brand/official account, not for other platforms, and not for pure post-writing (use us-social-voice or humanizer-zh instead)."
 agent_created: true
-version: 1.0.0
+version: 1.0.2
 display_name: "X 自媒体账号诊断"
 display_name_en: "X Self-Media Account Audit"
 ---
