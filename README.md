@@ -1,24 +1,50 @@
 # X Self-Media Audit · X 自媒体账号诊断
 
-> 一个 AI 技能（Agent Skill），对**个人 X（Twitter）账号**做端到端体检：账号数据、内容表现、人设定位、平台算法与合规规则 —— 然后给出**方向性建议 + 内容体系 + 30/60/90 天实操计划**。
+> 对**个人 X（Twitter）账号**做端到端体检：账号数据、内容表现、人设定位、平台算法与合规规则 —— 然后给出**方向性建议 + 内容体系 + 30/60/90 天实操计划**。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Language](https://img.shields.io/badge/lang-中文%20%7C%20English-blue)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 
 ---
 
-## English TL;DR
+## 🚀 一键安装
 
-**X Self-Media Audit** is an agent skill that audits a personal X (Twitter) account end-to-end — account metrics, content performance, personal-brand positioning, and platform/algorithm fit — then delivers strategic direction, a content system, and a concrete 30/60/90-day action playbook.
+复制下面这一行，粘到终端回车即可：
 
-Unlike a metrics dashboard, it **translates metrics into decisions**. A failed audit says "your engagement rate is 0.8%". A good audit says "your engagement rate is fine, but 62% of your impressions come from the wrong audience — that's why you're not growing."
+```bash
+curl -fsSL https://raw.githubusercontent.com/marslwc/x-selfmedia-audit/main/install.sh | bash
+```
 
-- **Input**: your handle + recent posts with metrics (or X Analytics screenshots/exports)
-- **Output**: a diagnostic report with scorecard, root-cause analysis, 2–3 strategic options, content pillars, 15+ topic ideas, and a week-by-week plan
-- **Built on**: X's open-source recommendation algorithm (`twitter/the-algorithm`), 2026 monetization rules, and published engagement benchmarks
-- **Includes**: two Python scripts for deterministic metric computation and monetization eligibility checks
+脚本会自动完成：检测技能目录 → 下载文件 → 校验 Python 环境 → 跑通自检 → 打印下一步。
 
-Jump to: [Install](#安装) · [Usage](#使用方式) · [Scripts](#脚本详解) · [Accuracy notes](#知识底座与准确性说明)
+**自定义安装位置：**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/marslwc/x-selfmedia-audit/main/install.sh | SKILLS_DIR=~/my-skills bash
+```
+
+**用 git 安装**（想随时 `git pull` 更新的话）：
+
+```bash
+git clone https://github.com/marslwc/x-selfmedia-audit.git \
+  ~/.workbuddy-ai/skills/x-selfmedia-audit
+```
+
+> 重复执行安装命令是安全的：检测到已有安装时会自动走 `git pull` 更新，不会重复下载。
+>
+> **无需 X API key，无需 pip install** —— 两个脚本只用 Python 标准库。
+
+---
+
+## ⚡ 30 秒看效果（不用安装，不用给数据）
+
+```bash
+git clone --depth 1 https://github.com/marslwc/x-selfmedia-audit.git /tmp/xsa && \
+python3 /tmp/xsa/scripts/x_audit.py --demo
+```
+
+会打印一份完整的模拟账号体检表，包含互动率、基准对比、四象限判定和预警清单。
 
 ---
 
@@ -78,37 +104,6 @@ L5 结论策略   → 交叉验证 + 优先级排序 + 行动
 | 正常/高 | 低 | **内容问题** | 钩子、受众错配、格式、表达 |
 | 正常/高 | 正常/高 | **转化问题** | 简介、置顶帖、头像、CTA |
 | 全低，持续数周 | | **先查限流** | 走安全标签自查流程 |
-
----
-
-## 安装
-
-这是一个标准的 Agent Skill（`SKILL.md` + `references/` + `scripts/` + `assets/`）。
-
-### 方式一：克隆到技能目录
-
-```bash
-# WorkBuddy AI / 兼容 skills 目录的 agent
-git clone https://github.com/marslwc/x-selfmedia-audit.git \
-  ~/.workbuddy-ai/skills/x-selfmedia-audit
-```
-
-### 方式二：手动安装
-
-把仓库内容整体复制到你的 agent skills 目录下，目录名保持 `x-selfmedia-audit`：
-
-```
-~/.workbuddy-ai/skills/x-selfmedia-audit/
-├── SKILL.md          ← 必须，技能入口
-├── references/
-├── scripts/
-└── assets/
-```
-
-### 依赖
-
-- Python 3.8+（仅用标准库，**无需 pip install**）
-- 无需 X API key —— 技能通过你提供的数据工作
 
 ---
 
@@ -215,6 +210,7 @@ python3 scripts/x_audit.py --csv posts.csv --followers 1240 --following 610
 ```
 
 CSV 表头（大小写不敏感）：
+
 ```
 text,date,impressions,likes,replies,retweets,bookmarks,profile_clicks,follows,type
 ```
@@ -334,6 +330,7 @@ python3 scripts/monetization_check.py --json profile.json
 x-selfmedia-audit/
 ├── SKILL.md                          # 技能入口：工作流、原则、交付规范
 ├── README.md                         # 本文件
+├── install.sh                        # 一键安装脚本
 ├── LICENSE
 ├── references/                       # 知识底座（按需加载）
 │   ├── algorithm-rules.md            # 算法权重、时间常数、限流标签、四类账号打法
@@ -353,16 +350,33 @@ x-selfmedia-audit/
 
 ---
 
-## 快速验证
+## English TL;DR
 
-克隆后不用配置任何东西，直接跑：
+**X Self-Media Audit** is an agent skill that audits a personal X (Twitter) account end-to-end — account metrics, content performance, personal-brand positioning, and platform/algorithm fit — then delivers strategic direction, a content system, and a concrete 30/60/90-day action playbook.
+
+Unlike a metrics dashboard, it **translates metrics into decisions**. A failed audit says "your engagement rate is 0.8%". A good audit says "your engagement rate is fine, but 62% of your impressions come from the wrong audience — that's why you're not growing."
+
+**Install:**
 
 ```bash
-python3 scripts/x_audit.py --demo
-python3 scripts/monetization_check.py --demo
+curl -fsSL https://raw.githubusercontent.com/marslwc/x-selfmedia-audit/main/install.sh | bash
 ```
 
-两个脚本都用标准库，无第三方依赖。
+**What it does**
+
+- **Input**: your handle + recent posts with metrics (or X Analytics screenshots/exports)
+- **Output**: a diagnostic report with scorecard, root-cause analysis, 2–3 strategic options, content pillars, 15+ topic ideas, and a week-by-week plan
+- **Built on**: X's open-source recommendation algorithm (`twitter/the-algorithm`), 2026 monetization rules, and published engagement benchmarks
+- **Includes**: two Python scripts for deterministic metric computation and monetization eligibility checks (stdlib only, no `pip install`, no API key required)
+
+**Quick try (no data needed):**
+
+```bash
+git clone --depth 1 https://github.com/marslwc/x-selfmedia-audit.git /tmp/xsa && \
+python3 /tmp/xsa/scripts/x_audit.py --demo
+```
+
+> Note: the skill's knowledge base and report output are primarily in Chinese. The methodology, scripts, and data structures are language-agnostic.
 
 ---
 
