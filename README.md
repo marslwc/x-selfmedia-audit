@@ -89,7 +89,7 @@ L5 结论策略   → 交叉验证 + 优先级排序 + 行动
 
 ```bash
 # WorkBuddy AI / 兼容 skills 目录的 agent
-git clone https://github.com/<your-name>/x-selfmedia-audit.git \
+git clone https://github.com/marslwc/x-selfmedia-audit.git \
   ~/.workbuddy-ai/skills/x-selfmedia-audit
 ```
 
